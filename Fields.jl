@@ -50,14 +50,15 @@ end
 # Position of the source
 z_init = Int(Nz / abs(Nz) + 5)
 
-# Initialize source
+# Initialize source parameters
 ω0 = 2π * 374.74057 * 1e12 # 800 nm
 k = (ω0 / c0)
 λ = 2π / k
 Nλ = λ / dz
 f = (2π * c0 * dt) / (Nλ * dz)
 #τ = 36  # Pulse duration (~FWHM)
-τ = 256
+τ = 512
+#τ = 640
 t0 = 6 * τ
 
 
@@ -67,8 +68,7 @@ ni0 = 4.995e27              # Atomic density of Si
 ne0 = 40*nc              # Fully ionized Si electron plasma density
 
 
-# Gaussian Envelope Parameters
-
+## Gaussian Envelope Parameters
 # Normalized relativistic field amplitude
 a0 = 0.001      
 # Electric field amplitude
@@ -77,8 +77,9 @@ E0 = (c0 * me * ω0 * a0) / e
 n_src = sqrt(ϵr[z_init] * μr[z_init])
 delta_t = (n_src * dz) / (2 * c0) + (dt / 2)    
 # Gaussian pulse centered at ω0 with correction to ΔCEP=0
-ge(t) = E0 .* exp(-((t - t0) ./ (τ)).^2) * cos((f * t)+π*5/8)
-gh(t) = (E0 / η0) .* exp(-((t - t0 + delta_t) ./ (τ)).^2) * cos((f * t)+π*5/8)
+ge(t) = E0 .* exp(-((t - t0) ./ (τ)).^2) * cos((f * t)+π*5/4)
+gh(t) = -(E0 / η0) .* exp(-((t - t0 + delta_t) ./ (τ)).^2) * cos((f * t)+π*5/4)
+
 
 # Ricker Wavelet
 arg = S / Nλ

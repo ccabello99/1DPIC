@@ -12,17 +12,23 @@ include("Particles.jl")
 include("Fields.jl")
 
 # Initialize plasma
-num_particles = 2000
 global ne, ni = initGrad(ne, ni)
-global particles, electrons, ions = createParticles(num_particles)
+global particles = initParticles()
 
 # Calculate Initial Charge Distribution and Static Fields
 global ρ, Jz, Jy = InterpolateCharge(particles, ρ, Jz, Jy)
 global Φ, Ez = updateStatic(ρ, Φ, ϵ, Ez)
 
-# To visualize before time loops 
+
+## To visualize before time loops 
+#num_macro = countParticles(particles)
+#display(scatter(z, num_macro, label="Number of Macro Particles"))
+#tt = range(1, nsteps, nsteps)
+#display(plot(tt .* dt .* 1e15, ge.(tt), xlims=[0,50]))
 #display(plot(z, Φ, label="Electric Potential"))
-#display(scatter!(z, ρ, label="Charge Density"))
+#display(scatter(z, ρ, label="Charge Density"))
+#display(plot(z, ne, label="Electron Density"))
+#display(plot!(z, ni, label="Ion Density"))
 #end
 
 # Vector to save field for later processing
@@ -55,25 +61,27 @@ for t = 1:nsteps
 
     # Plotting
     if t % 10 == 0
-        local p = plot(z, Ey, label = "Ey", title = "1D PIC Simulation", lw = 2, ylims=[-1.5*E0, 1.5*E0], xlabel = "Z (μm)", ylabel="Field Strength (V/m)", legend = true)
-        plot!(z, Hx, lw = 2, label = "Hx")
+        #local p = plot(z, Ey, label = "Ey", title = "1D PIC Simulation", lw = 2, ylims=[-1.5*E0, 1.5*E0], xlabel = "Z (μm)", ylabel="Field Strength (V/m)", legend = true)
+        #plot!(z, Hx, lw = 2, label = "Hx")
         #p = plot(z, Ez, label="Ez (static)")
         #p = scatter(particle_z, Ey)
         #scatter!(z, ρ ./ norm(ρ), label="Charge Density")
-        #plot!(z, Jz, label="Current Density (z)")
-        plot!(z, (dt ./ (ne .* e^2)) .* Jy, label = "Current Density (y)", color=:green)
+        #local p = plot(z, ne, label="Electron Density")
+        #plot!(z, ni, label="Ion Density")
+        #p = plot(z, ϵr, label="Relative Permittivity")
+        #plot!(z, (dt ./ (ne .* e^2)) .* Jy, label = "Current Density (y)", color=:green)
         #plot!(z, Φ)
         display(p)
         #savefig(p, "plot_$t.png")
-        sleep(0.025)
+        #sleep(0.025)
     end
 
 end
 
 
 # Save incident and reflected fields from Ey_save
-#Ey_inc = Ey_save[1:1000]
-#Ey_ref = Ey_save[1001:end]
+Ey_inc = Ey_save[1:15500]
+Ey_ref = Ey_save[15501:end]
 
-#writedlm( "Ey_inc.csv",  Ey_inc, ',')
-#writedlm( "Ey_ref.csv",  Ey_ref, ',')
+writedlm( "Ey_inc.csv",  Ey_inc, ',')
+writedlm( "Ey_ref.csv",  Ey_ref, ',')

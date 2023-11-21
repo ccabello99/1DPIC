@@ -1,6 +1,6 @@
 # Size of the grid
-#Nz = 8192
-Nz = 512       # For testing
+Nz = 4096
+#Nz = 512       # For testing
 Lz = 4e-5
 
 # Grid parameters
@@ -10,8 +10,9 @@ z = range(0, Nz, Nz) .* dz * 1e6
 
 # Calculate number of time steps for one roundtrip
 dt = dz / (2 * c0)
-τ = 36     # Choose for testing grid
-#τ = 256
+#τ = 36     # Choose for testing grid
+τ = 512
+#τ = 640
 # Accounts for reflection from front surface
 excess = 0.4e-5 / dz
 # Roundtrip time

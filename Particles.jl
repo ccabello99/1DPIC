@@ -9,11 +9,13 @@ e = 1.6e-19     # Electron charge
 me = 9.11e-31       # Electron mass
 mp = 1.67e-27       # Proton mass
 mi = 28 * mp        # Silicon ion mass
+Z = 14              # Silicon atomic number
 ϵ0 = 8.85e-12     # Vacuum permittivity
 
 # Plasma parameters
-#Te = 1e3*11604    # Initial temperatures (1 keV)
-#Ti = 1e3*11604
+num_particles = 75      # Number of particles per cell
+Te = 1e3*11604    # Initial temperatures (1 keV)
+Ti = 1e3*11604
 nc = ϵ0 * me * ω0^2 / e^2   # Critical density (m^-3)
 ni0 = 4.995e27              # Atomic density of Si
 ne0 = 40*nc                 # Fully ionized Si electron plasma density
@@ -43,15 +45,15 @@ end
 # Initialize plasma density profile
 function initGrad(ne, ni)
 
-    L = 0.05 * λ
+    L = 0.5 * λ
     front = 0.9 * Lz
     eplasma_gradient(x) = ne0 * exp((x - front) / L)
     iplasma_gradient(x) = ni0 * exp((x - front) / L)
 
     for i in 1:Nz
         if i*dz <= front
-            ne[i] = eplasma_gradient(i * dz)+1e-36
-            ni[i] = iplasma_gradient(i * dz)+1e-36
+            ne[i] = eplasma_gradient(i * dz)+1e-40
+            ni[i] = iplasma_gradient(i * dz)+1e-40
         else    
             ne[i] = ne0
             ni[i] = ni0 
@@ -61,9 +63,9 @@ function initGrad(ne, ni)
 end
 
 # Initialize random velocities
-function initVelocities(T, m)
+function initVelocities(T, m, q)
 
-    thermal_velocity = √(kb * T / m)
+    thermal_velocity = √(abs(q/e) * kb * T / m)
     dist = thermal_velocity * Normal(0, 1)
     vz = rand(dist)
     vy = 0
@@ -71,20 +73,9 @@ function initVelocities(T, m)
     return v
 end
 
-function updateDensity(particles, ne)
+# Count number of macro particles in each grid cell
+function countParticles(particles)
 
-    for particle in particles
-        i = Int(floor(particle.z / dz)) 
-        if i >= 1 && i < Nz
-            ne[i] = particle.w / dz
-        end
-    end
-    return ne
-end
-
-function assignWeight(particles)
-
-    # Count number of macro particles in each grid cell
     local num_macroparticles = zeros(Int, Nz)
 
     for particle in particles
@@ -92,7 +83,30 @@ function assignWeight(particles)
         num_macroparticles[i] += 1    
     end
 
-    # Assign weights based on macro particles per cell and species density
+    return num_macroparticles
+end
+
+# Update electron density
+function updateDensity(particles, ne)
+
+    num_macroparticles = countParticles(particles)
+
+    for particle in particles
+        i = Int(floor(particle.z / dz)) 
+        if i >= 1 && i < Nz
+            if particle.s == "Electron"
+                ne[i] = particle.w * num_macroparticles[i] / dz
+            end
+        end
+    end
+    return ne
+end
+
+# Assign weights based on macro particles per cell and species density
+function assignWeight(particles)
+
+    num_macroparticles = countParticles(particles)
+
     for particle in particles
         i = Int(floor(particle.z / dz))
 
@@ -108,64 +122,71 @@ function assignWeight(particles)
     return particles
 end
 
-# Initialize particles
-function createParticles(num_particles)
+# Create particles at a certain position
+function createParticles(num_particles, pos)
 
-    particles = Particle[]
     electrons = Particle[]
     ions = Particle[]
 
     # Regions of (in)homogenous plasma density profile
-    homog = Uniform(9/10, 1)
-    inhomog = Uniform(6/10, 9/10)
+    #homog = Uniform(9/10, 1)
+    #inhomog = Uniform(7/10, 9/10)
 
-    for i in 1:2num_particles
+    for i in 1:num_particles
         # Initial velocity to start at rest
-        v = [0, 0]
-        γ = 1
+        #v = [0, 0]
+        #γ = 1        
 
-            if i <= 0.75 * num_particles
-                z = rand(homog) * Lz
-                #v = initVelocities(Te, me)
-                q = -e 
-                w = 1.0
-                m = me
-                s = "Electron"
-                push!(electrons, Particle(z, v, q, m, s, w, γ))
-            
-            elseif i <= 1.5 * num_particles
-                z = rand(inhomog) * Lz
-                #v = initVelocities(Te, me)
+            if i <= 70
+                z =  pos * Lz
                 q = -e
+                v = initVelocities(Te, me, q)
                 w = 1.0
                 m = me
                 s = "Electron"
+                γ = √(1 - dot(v, v) / c0^2)
                 push!(electrons, Particle(z, v, q, m, s, w, γ))
-
-            elseif i <= 1.75 * num_particles
-                z = rand(homog) * Lz
-                #v = initVelocities(Ti, mi)
-                q = 14*e
-                w = 1.0
-                m = mi
-                s = "Ion"
-                push!(ions, Particle(z, v, q, m, s, w, γ))
-
             else
-                z = rand(inhomog) * Lz
-                #v = initVelocities(Ti, mi)
-                q = 14*e
+                z = pos * Lz
+                q = Z*e
+                v = initVelocities(Ti, mi, q)
                 w = 1.0
                 m = mi
                 s = "Ion"
+                γ = √(1 - dot(v, v) / c0^2)
                 push!(ions, Particle(z, v, q, m, s, w, γ))
             end 
-
-        push!(particles, Particle(z, v, q, m, s, w, γ))
     end
+    
+    return electrons, ions
+end
+
+# Initialize all particles 
+function initParticles()
+
+    particles = Particle[]
+
+    # Initial position corresponding to 6192 grid index
+    # Currently set for  particles (20 e & 5 ions) per cell
+    pos = 0.755859375
+    step = 1/8192
+    num_iter = Int((1 - pos) / step)
+    
+    for i in 1:num_iter
+        electrons, ions = createParticles(num_particles, pos)
+        # Append electrons and ions to full particles list
+        for electron in electrons
+            push!(particles, electron)
+        end
+        for ion in ions
+            push!(particles, ion)
+        end
+        pos += step
+    end
+
     particles = assignWeight(particles)
 
-    return particles, electrons, ions
+    return particles
 end
 
 # Linear interpolation to calculate charge/current density on grid
@@ -241,7 +262,7 @@ function velocityUpdate(particles, E_z, E_y, H_x)
             Ez = (1 - δz) * E_z[i] + δz * E_z[i + 1]
             Ey = (1 - δz) * E_y[i] + δz * E_y[i + 1]
 
-            # Derivative of Ey^2 (assuming dy=dz) for ponderomotive force
+            # Central finite difference for ∇(Ey^2) (assuming dy=dz)
             dEy2dy = 0.5 * (E_y[i + 1]^2 - E_y[i-1]^2) / dz
 
 

@@ -48,17 +48,17 @@ X_ref = abs.(ft_ref)
 #end
 
 
-p = plot(t .- 78.465, Ey_inc, xlabel="Time (fs)", ylabel="Electric Field Strength (V/m)", lw = 2, color="blue", label="Incident", title="Incident and Reflected Time-Dependent Fields")
-plot!(t .- 63.79, Ey_ref, lw = 2, color="red", label="Reflected")
+p = plot(t .- 79.085, -Ey_inc, xlabel="Time (fs)", ylabel="Electric Field Strength (V/m)", lw = 2, color="blue", label="Incident", title="Incident and Reflected Time-Dependent Fields")
+plot!(t .- 51.16, -Ey_ref, lw = 2, color="red", label="Reflected")
 #vline!([0])
-#xlims!(-15, 15)
+xlims!(-15, 15)
 
 #p = plot(f ./ f0, [ϕ_inc[1:n] .+ f[1:n] .* .25e-13 .- 0,ϕ_ref[1:n] .+ f[1:n] .* 0.41e-12 .+ 20], xlabel="Frequency (fund. freq.)", ylabel="Spectral Phase (rad)")
 
-#p = plot(f ./ f0, X_inc[1:n] ./ maximum(abs.(X_inc)), yaxis=:log, label="Incident", title="Incident and Reflected Field Spectra", ylims=[1e-12, 1.5e1], xlabel="Frequency (fund. freq.)", ylabel="Spectral Intensity (arb. units)", lw = 2, color="blue")
-#plot!(f ./ f0, X_ref[1:n] ./ maximum(abs.(X_ref)), yaxis=:log, label="Reflected", lw = 2, color="red")
-#xlims!(0, 30)
-#xticks!(range(1,10,10))
+p = plot(f ./ f0, X_inc[1:n] ./ maximum(abs.(X_inc)), yaxis=:log, label="Incident", title="Incident and Reflected Field Spectra", ylims=[1e-12, 1.5e1], xlabel="Frequency (fund. freq.)", ylabel="Spectral Intensity (arb. units)", lw = 2, color="blue")
+plot!(f ./ f0, X_ref[1:n] ./ maximum(abs.(X_ref)), yaxis=:log, label="Reflected", lw = 2, color="red")
+xlims!(0, 10)
+xticks!(range(1,10,10))
 
 #p = plot(1e9*c0 ./ f, X_inc[1:n] ./ maximum(abs.(X_inc)), label="Incident Field", title="Incident and Reflected Field Spectra", xlabel="Wavelength (nm)", ylabel="Spectral Intensity (arb. units)")
 #plot!(1e9*c0 ./ f, X_ref[1:n] ./ maximum(abs.(X_ref)), label="Reflected Field", title="Incident and Reflected Field Spectra", xlabel="Wavelength (nm)", ylabel="Spectral Intensity (arb. units)")
@@ -73,4 +73,4 @@ display(p)
 # For Time Dependent Fields
 #savefig(p, "Fields_L005_a0001.pdf")
 # For Spectra
-#savefig(p, "Spect_L005_a0001.pdf")
+savefig(p, "Spect_L005_a0001.pdf")
