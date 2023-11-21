@@ -29,7 +29,7 @@ global Φ, Ez = updateStatic(ρ, Φ, ϵ, Ez)
 #display(scatter(z, ρ, label="Charge Density"))
 #display(plot(z, ne, label="Electron Density"))
 #display(plot!(z, ni, label="Ion Density"))
-#end
+end
 
 # Vector to save field for later processing
 Ey_save = zeros(nsteps)
@@ -63,15 +63,15 @@ for t = 1:nsteps
     if t % 10 == 0
         #local p = plot(z, Ey, label = "Ey", title = "1D PIC Simulation", lw = 2, ylims=[-1.5*E0, 1.5*E0], xlabel = "Z (μm)", ylabel="Field Strength (V/m)", legend = true)
         #plot!(z, Hx, lw = 2, label = "Hx")
-        #p = plot(z, Ez, label="Ez (static)")
+        #p = plot(z, Ez, label="Ez")
         #p = scatter(particle_z, Ey)
-        #scatter!(z, ρ ./ norm(ρ), label="Charge Density")
+        scatter!(z, ρ ./ norm(ρ), label="Charge Density")
         #local p = plot(z, ne, label="Electron Density")
         #plot!(z, ni, label="Ion Density")
         #p = plot(z, ϵr, label="Relative Permittivity")
         #plot!(z, (dt ./ (ne .* e^2)) .* Jy, label = "Current Density (y)", color=:green)
         #plot!(z, Φ)
-        display(p)
+        #display(p)
         #savefig(p, "plot_$t.png")
         #sleep(0.025)
     end

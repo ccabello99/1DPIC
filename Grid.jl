@@ -1,5 +1,5 @@
 # Size of the grid
-Nz = 4096
+Nz = 8192
 #Nz = 512       # For testing
 Lz = 4e-5
 

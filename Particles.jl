@@ -92,7 +92,7 @@ function updateDensity(particles, ne)
     num_macroparticles = countParticles(particles)
 
     for particle in particles
-        i = Int(floor(particle.z / dz)) 
+        i = Int(round(particle.z / dz)) 
         if i >= 1 && i < Nz
             if particle.s == "Electron"
                 ne[i] = particle.w * num_macroparticles[i] / dz
@@ -108,7 +108,7 @@ function assignWeight(particles)
     num_macroparticles = countParticles(particles)
 
     for particle in particles
-        i = Int(floor(particle.z / dz))
+        i = Int(round(particle.z / dz))
 
         if particle.s == "Electron"
             particle.w = ne[i] * dz / num_macroparticles[i]
@@ -189,15 +189,30 @@ function initParticles()
     return particles
 end
 
+# Initialize Charge/Current Density without interpolation
+function initCharge(particles, ρ, Jz, Jy)
+    for particle in particles
+        i = Int(round(particle.z / dz))
+        if i >= 1 && i < Nz
+            ρ[i] = (particle.q * particle.w / dz)
+
+            Jz[i] = ρ[i] * particle.v[1]
+
+            Jy[i] = ρ[i] * particle.v[2]
+        end
+    end
+    return ρ, Jz, Jy
+end
+
 # Linear interpolation to calculate charge/current density on grid
 function InterpolateCharge(particles, ρ, Jz, Jy)
 
     for particle in particles
-        i = Int(floor(particle.z / dz))
+        i = Int(round(particle.z / dz))
         if i >= 1 && i < Nz
             δz = particle.z / dz - i
 
-            ρ[i] = abs(1 - δz) * (particle.q * particle.w / dz)
+            ρ[i] = (1 - δz) * (particle.q * particle.w / dz)
             ρ[i + 1] = abs(δz) * (particle.q * particle.w / dz)
 
             Jz[i] = ρ[i] * particle.v[1]
@@ -253,7 +268,7 @@ function velocityUpdate(particles, E_z, E_y, H_x)
     B_x =  μ0 .* H_x
 
     for particle in particles
-        i = Int(floor(particle.z / dz))
+        i = Int(round(particle.z / dz))
         if i >= 1 && i < Nz && round(particle.w, digits=3) != 0
             δz = particle.z / dz - i
 
@@ -311,7 +326,7 @@ function updateParticles(particles, E_z, E_y, H_x)
 
     # Perform half of position update
     for particle in particles
-        i = Int(floor(particle.z / dz))
+        i = Int(round(particle.z / dz))
         if i >= 1 && i < Nz
             particle.z += 0.5 * particle.v[1] * dt
         end
@@ -322,7 +337,7 @@ function updateParticles(particles, E_z, E_y, H_x)
 
     # Perform second half of position update
     for particle in particles
-        i = Int(floor(particle.z / dz))
+        i = Int(round(particle.z / dz))
         if i >= 1 && i < Nz
             particle.z += 0.5 * particle.v[1] * dt
         end
