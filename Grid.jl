@@ -1,4 +1,3 @@
-using FFTW
 # Size of the grid
 #Nz = 8192
 Nz = 512       # For testing
