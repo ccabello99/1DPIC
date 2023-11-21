@@ -5,78 +5,75 @@ using Distributions
 using Colors
 using LinearAlgebra
 using FFTW
-using SparseArrays
+using DelimitedFiles
 
 include("Grid.jl")
 include("Particles.jl")
 include("Fields.jl")
 
 # Initialize plasma
-num_particles = 1000
-global particles, electrons, protons = createParticles(num_particles)
+num_particles = 2000
+global ne, ni = initGrad(ne, ni)
+global particles, electrons, ions = createParticles(num_particles)
 
-# Calculate Charge Distribution, Static Fields, and Interaction Parameters
+# Calculate Initial Charge Distribution and Static Fields
 global ρ, Jz, Jy = InterpolateCharge(particles, ρ, Jz, Jy)
-
 global Φ, Ez = updateStatic(ρ, Φ, ϵ, Ez)
 
-global ϵr = updatePermittivity(ρ, ω0, ne)
-
-#display(plot(z, Φ.*8, label="Electric Potential"))
+# To visualize before time loops 
+#display(plot(z, Φ, label="Electric Potential"))
 #display(scatter!(z, ρ, label="Charge Density"))
 #end
 
-#T = range(1, nsteps, nsteps)
-#display(plot(T, ge.(T), xlims=[0, nsteps]))
-#end
-
-
-#eyr = ones(Complex{Float64}, nfreq)
-#eyt = ones(Complex{Float64}, nfreq)
-#src = ones(Complex{Float64}, nfreq)
+# Vector to save field for later processing
+Ey_save = zeros(nsteps)
+node = Int(round(0.5 * Nz))
 
 for t = 1:nsteps
 
-    # Calculate permittivity of the grid
-    global ϵr = updatePermittivity(ρ, ω0, ne)
+    # Update electron density and update permittivity
+    global ne = updateDensity(particles, ne)
+    global ϵr = updatePermittivity(ω0, ne)
+
+    # Update FDTD coefficients
+    global ceh, che, cee, σ = updateCoefficients(ϵr, μr)
 
     # Solve Maxwell's eqs
-    global Ey, Hx, E1, E2, H1, H2 = FDTD(Ey, Hx, E1, E2, H1, H2, Jy, t)
+    global Ey, Hx, E1, E2, E3, H1, H2, H3 = FDTD(Ey, Hx, E1, E2, E3, H1, H2, H3, Jy, t)
 
-    particle_z = []
-    #for particle in particles
-    #    push!(particle_z, particle.z)
-    #end
-    #print(particle_z)
     # Particle Push
     global particles = updateParticles(particles, Ez, Ey, Hx) 
 
-    # Calculate Charge/Current Density and Static Fields
+    # Interpolate Charge/Current Density to grid
     global ρ, Jz, Jy = InterpolateCharge(particles, ρ, Jz, Jy)
 
+    # Calculate Static Fields
     global Φ, Ez = updateStatic(ρ, Φ, ϵ, Ez)
 
+    # Save Electric field component of interest for later processing 
+    Ey_save[t] = Ey[node]
 
     # Plotting
-    if t % 5 == 0
-        #p = plot(z, Ey / E0, legend = true, title = "1D PIC Simulation", lw = 2, xlabel = "Z (μm)", label = "Ey")
-        #plot!(z, Hx, lw = 2, label = "Hx")
+    if t % 10 == 0
+        local p = plot(z, Ey, label = "Ey", title = "1D PIC Simulation", lw = 2, ylims=[-1.5*E0, 1.5*E0], xlabel = "Z (μm)", ylabel="Field Strength (V/m)", legend = true)
+        plot!(z, Hx, lw = 2, label = "Hx")
         #p = plot(z, Ez, label="Ez (static)")
-        #ρ
-        p = scatter(z, ρ, label="Charge Density")
-        #scatter!(z, Jz, label="Current Density (z)")
-        #scatter!(z, Jy, label="Current Density (y)")
+        #p = scatter(particle_z, Ey)
+        #scatter!(z, ρ ./ norm(ρ), label="Charge Density")
+        #plot!(z, Jz, label="Current Density (z)")
+        plot!(z, (dt ./ (ne .* e^2)) .* Jy, label = "Current Density (y)", color=:green)
         #plot!(z, Φ)
-        # Draw dielectric
-        #plot!([1050, 1050, 2000, 2000], [-1.5, 1.5, 1.5, -1.5], lw = 3, color = :black, legend = false)
         display(p)
-        sleep(0.02)
+        #savefig(p, "plot_$t.png")
+        sleep(0.025)
     end
-    #display()
-
-    # Draw dielectric
-    #display()
-
 
 end
 
+
+# Save incident and reflected fields from Ey_save
+#Ey_inc = Ey_save[1:1000]
+#Ey_ref = Ey_save[1001:end]
+
+#writedlm( "Ey_inc.csv",  Ey_inc, ',')
+#writedlm( "Ey_ref.csv",  Ey_ref, ',')

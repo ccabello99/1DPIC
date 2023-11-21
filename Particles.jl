@@ -1,30 +1,33 @@
 include("Grid.jl")
 include("Fields.jl")
 using LinearAlgebra
+using Distributions
 
 # Physical constants
 kb = 1.38e-23   # Boltzmann constant
-#e = 1.6e-19     # Electron charge
-#me = 9.11e-31       # Electron mass
-#mp = 1.67e-27       # Proton mass
-# Atomic units
-me = 1
-mp = 1800
-e = 1
+e = 1.6e-19     # Electron charge
+me = 9.11e-31       # Electron mass
+mp = 1.67e-27       # Proton mass
+mi = 28 * mp        # Silicon ion mass
+ϵ0 = 8.85e-12     # Vacuum permittivity
 
 # Plasma parameters
-Te_i = 200    # Initial temperatures
-Tp_i = 200
-#ne0 = 198 * 1.74e21   # Species densities (m^-3)
-ne0 = 6.6e29
+#Te = 1e3*11604    # Initial temperatures (1 keV)
+#Ti = 1e3*11604
+nc = ϵ0 * me * ω0^2 / e^2   # Critical density (m^-3)
+ni0 = 4.995e27              # Atomic density of Si
+ne0 = 40*nc                 # Fully ionized Si electron plasma density
+
+# Initialize dynamical variables
 global ne = zeros(Nz)
-ni0 = ne0
 global ni = zeros(Nz)
 global ϵr = ones(Nz)
-ϵ0 = 8.85e-12     # Vacuum permittivity
 global ϵ = ϵ0.*ϵr
-#cs = √(kb * Te_i / mp)  # Ion sound velocity
-#global L(t) = cs * t           # Plasma density expansion 
+global ρ = zeros(Nz)
+global Φ = zeros(Nz)
+global Ez = zeros(Nz)
+global Jy = zeros(Nz)
+global Jz = zeros(Nz)
 
 # Particle structure
 mutable struct Particle
@@ -37,79 +40,93 @@ mutable struct Particle
     γ::Float64  # Lorentz factor
 end
 
-# Initialize plasma density gradient
-L = 0.5 * λ
-front = 0.9 * Lz
-eplasma_gradient(x) = ne0 * exp((x - front) / L)
-iplasma_gradient(x) = ni0 * exp((x - front) / L)
+# Initialize plasma density profile
+function initGrad(ne, ni)
 
-for i in 1:Nz
-    if i*dz <= front
-        ne[i] = eplasma_gradient(i * dz)
-        ni[i] = iplasma_gradient(i * dz)
-    else
-        ne[i] = ne0
-        ni[i] = ni0 
+    L = 0.05 * λ
+    front = 0.9 * Lz
+    eplasma_gradient(x) = ne0 * exp((x - front) / L)
+    iplasma_gradient(x) = ni0 * exp((x - front) / L)
+
+    for i in 1:Nz
+        if i*dz <= front
+            ne[i] = eplasma_gradient(i * dz)+1e-36
+            ni[i] = iplasma_gradient(i * dz)+1e-36
+        else    
+            ne[i] = ne0
+            ni[i] = ni0 
+        end
     end
+    return ne, ni
 end
 
-# Initialize vectors
-global ρ = zeros(Nz)
-global Φ = zeros(Nz)
-global Ez = zeros(Nz)
-global Jy = zeros(Nz)
-global Jz = zeros(Nz)
+# Initialize random velocities
+function initVelocities(T, m)
+
+    thermal_velocity = √(kb * T / m)
+    dist = thermal_velocity * Normal(0, 1)
+    vz = rand(dist)
+    vy = 0
+    v = [vz, vy]
+    return v
+end
+
+function updateDensity(particles, ne)
+
+    for particle in particles
+        i = Int(floor(particle.z / dz)) 
+        if i >= 1 && i < Nz
+            ne[i] = particle.w / dz
+        end
+    end
+    return ne
+end
 
 function assignWeight(particles)
 
-    # First, count number of macro particles in each grid cell
+    # Count number of macro particles in each grid cell
     local num_macroparticles = zeros(Int, Nz)
 
-    for particle in particles    
-        # Determine the cell indices
+    for particle in particles
         i = Int(floor(particle.z / dz))  
-
-        # Increase the count of macro-particles in the cell
         num_macroparticles[i] += 1    
     end
 
-    # Now, assign weights based on number of macro particles per cell
+    # Assign weights based on macro particles per cell and species density
     for particle in particles
-
-        # Get macro_particle indices
         i = Int(floor(particle.z / dz))
 
         if particle.s == "Electron"
             particle.w = ne[i] * dz / num_macroparticles[i]
         end
 
-        if particle.s == "Proton"
+        if particle.s == "Ion"
             particle.w = ni[i] * dz / num_macroparticles[i]
         end
 
-end
+    end
     return particles
 end
 
 # Initialize particles
 function createParticles(num_particles)
+
     particles = Particle[]
     electrons = Particle[]
-    protons = Particle[]
+    ions = Particle[]
+
+    # Regions of (in)homogenous plasma density profile
     homog = Uniform(9/10, 1)
-    inhomog = Uniform(5/10, 9/10)
+    inhomog = Uniform(6/10, 9/10)
 
     for i in 1:2num_particles
-        # Initial position
-        #z = rand(homog) * Lz
-        #z = (0.25+rand()*0.01)* Lz     # For testing
-        # Initial velocity
+        # Initial velocity to start at rest
         v = [0, 0]
         γ = 1
 
             if i <= 0.75 * num_particles
                 z = rand(homog) * Lz
-                #z = (0.05+rand()*0.25)* Lz
+                #v = initVelocities(Te, me)
                 q = -e 
                 w = 1.0
                 m = me
@@ -118,7 +135,7 @@ function createParticles(num_particles)
             
             elseif i <= 1.5 * num_particles
                 z = rand(inhomog) * Lz
-                #z = (0.6+rand()*0.15)* Lz
+                #v = initVelocities(Te, me)
                 q = -e
                 w = 1.0
                 m = me
@@ -127,56 +144,52 @@ function createParticles(num_particles)
 
             elseif i <= 1.75 * num_particles
                 z = rand(homog) * Lz
-                #z = (0.6+rand()*0.15)* Lz
-                q = e
+                #v = initVelocities(Ti, mi)
+                q = 14*e
                 w = 1.0
-                m = mp
-                s = "Proton"
-                push!(protons, Particle(z, v, q, m, s, w, γ))
+                m = mi
+                s = "Ion"
+                push!(ions, Particle(z, v, q, m, s, w, γ))
 
             else
                 z = rand(inhomog) * Lz
-                q = e
+                #v = initVelocities(Ti, mi)
+                q = 14*e
                 w = 1.0
-                m = mp
-                s = "Proton"
-                push!(protons, Particle(z, v, q, m, s, w, γ))
+                m = mi
+                s = "Ion"
+                push!(ions, Particle(z, v, q, m, s, w, γ))
             end 
 
         push!(particles, Particle(z, v, q, m, s, w, γ))
     end
-    #particles = assignWeight(particles)
+    particles = assignWeight(particles)
 
-    return particles, electrons, protons
+    return particles, electrons, ions
 end
 
-#print(ne)
-#print(dz)
-#display(scatter(z, ne))
-#print(ne[2])
-
+# Linear interpolation to calculate charge/current density on grid
 function InterpolateCharge(particles, ρ, Jz, Jy)
 
     for particle in particles
         i = Int(floor(particle.z / dz))
-        #i = Int(clamp(round(particle.z / dz), 1, Nz))
-        if i >= 1 && i < Nz && round(particle.w, digits=3) != 0
+        if i >= 1 && i < Nz
             δz = particle.z / dz - i
 
             ρ[i] = abs(1 - δz) * (particle.q * particle.w / dz)
             ρ[i + 1] = abs(δz) * (particle.q * particle.w / dz)
 
-            Jz[i] += ρ[i] * particle.v[1]
-            Jz[i + 1] += ρ[i + 1] * particle.v[1]
+            Jz[i] = ρ[i] * particle.v[1]
+            Jz[i + 1] = ρ[i + 1] * particle.v[1]
 
-            Jy[i] += ρ[i] * particle.v[2]
-            Jy[i + 1] += ρ[i + 1] * particle.v[2]
+            Jy[i] = ρ[i] * particle.v[2]
+            Jy[i + 1] = ρ[i + 1] * particle.v[2]
         end
     end
     return ρ, Jz, Jy
 end
 
-# Define the Poisson solver function
+# Poisson solver for 1D
 function solvePoisson(ρ, ϵ)
 
     # Generate triagiagonal matrix for the linear system:
@@ -190,13 +203,14 @@ function solvePoisson(ρ, ϵ)
     ρ[1] = 0
     ρ[end] = maximum(ρ)
 
-    # Solve:
+    # Solve
     rhs = ρ ./ ϵ
     Φ = tri \ rhs;
 
     return Φ
 end
 
+# Update static field
 function updateStatic(ρ, Φ, ϵ, Ez)
 
     Φ = solvePoisson(ρ, ϵ)
@@ -211,51 +225,7 @@ function updateStatic(ρ, Φ, ϵ, Ez)
     return Φ, Ez
 end
 
-function borisUpdate(particle, E_z, E_y, H_x)
-    # Convert H to B for Lorentz force
-    B_x =  μ0 .* H_x
-
-    for particle in particles
-        i = Int(floor(particle.z / dz))
-        #i = Int(clamp(round(particle.z / dz), 1, Nz))
-        if i >= 1 && i < Nz && round(particle.w, digits=3) != 0
-            δz = particle.z / dz - i
-
-            # Interpolate fields to grid
-            Bx = (1 - δz) * B_x[i] + δz * B_x[i + 1]
-            Ez = (1 - δz) * E_z[i] + δz * E_z[i + 1]
-            Ey = (1 - δz) * E_y[i] + δz * E_y[i + 1]
-
-            # Update coefficient
-            qmdt = 0.5 * particle.q * dt / (particle.m)
-
-            # # Define 3D vector for relativistic momentum
-            uz = particle.v[1] * particle.γ
-            uy = particle.v[2] .* particle.γ
-            ux = 0
-            u3 = [0, uy, uz]
-    
-            # First half of velocity update
-            u_minus = u3 + qmdt * [0, Ey, Ez]
-    
-
-            # Auxilary values for rotation
-            particle.γ = √(1 + (dot(u_minus,u_minus) / c0^2))
-            t = qmdt .* [Bx, 0, 0] ./ particle.γ
-            s = 2 * t / (1 + dot(t, t))
-
-            # Velocity rotation plus second half of update
-            u_prime = u_minus + cross(u_minus, t)
-            u_plus = u_minus + cross(u_prime, s)
-
-            # Final update of each particle's velocity
-            particle.v[1] = u_plus[3] + qmdt * Ez
-            particle.v[2] = u_plus[2] + qmdt * Ey
-        end
-    end
-    return particles
-end
-
+# Velocity update function
 function velocityUpdate(particles, E_z, E_y, H_x)
 
     # Convert H to B for Lorentz force
@@ -266,37 +236,48 @@ function velocityUpdate(particles, E_z, E_y, H_x)
         if i >= 1 && i < Nz && round(particle.w, digits=3) != 0
             δz = particle.z / dz - i
 
-            # Interpolate fields to grid
+            # Linear interpolation of fields to grid
             Bx = (1 - δz) * B_x[i] + δz * B_x[i + 1]
             Ez = (1 - δz) * E_z[i] + δz * E_z[i + 1]
             Ey = (1 - δz) * E_y[i] + δz * E_y[i + 1]
 
+            # Derivative of Ey^2 (assuming dy=dz) for ponderomotive force
+            dEy2dy = 0.5 * (E_y[i + 1]^2 - E_y[i-1]^2) / dz
+
 
             # Velocity update with (Vay 2008) formalism
 
-            # Initial values
-            #γ = 1 / √(1 - (norm(particle.v) / c0^2))
-            u = particle.γ .* particle.v
-            r = particle.q * dt / (2*particle.m)
-
-            # Half of the velocity update 
-            u_half = u + r * ([Ez, Ey] + 0.5 .* [-(u[2]/particle.γ)*Bx, (u[1]/particle.γ)*Bx])
+            # Initial values / create 3D vectors
+            r = particle.q * dt / (particle.m)
+            uz = particle.γ .* particle.v[1]
+            uy = particle.γ .* particle.v[2]
+            u = [0, uy, uz]
+            v = [0, uy, uz] ./ particle.γ
+            E = [0, Ey, Ez]
+            B = [Bx, 0, 0]
             
-            # Compute other half (u_star zero since Bx . [Ez, Ey] = 0)
-            u_prime = u_half +  r .* [Ez, Ey]
-            u_star = 0
+            # Half of the velocity update 
+            u_star = u + r * (E + 0.5 .* cross(v, B))
 
             # Compute auxilary values for final update
-            tau = r * Bx
-            γprime = √(1 + (norm(u_prime) / c0^2) )
-            σ = (γprime^2 - tau^2)
-            particle.γ = √((σ + √(σ^2 + 4*(tau^2 + u_star^2) ) ) / 2)
+            tau = 0.5 * r .* B
+            γprime = √(1 + (dot(u_star, u_star) ./ c0^2))
+            σ = (γprime^2 - dot(tau, tau))
+            w = dot(u_star, tau)
+            particle.γ = √((σ + √(σ^2 + (dot(tau, tau) + w^2) ) ))
             t = tau ./ particle.γ
-            s = 1 / (1 + t^2)
+            s = 1 / (1 + dot(t, t))
         
-            # Final update
-            u = s * (u_prime + [-u_prime[2] * t, u_prime[1] * t])
-            particle.v = u ./ particle.γ 
+            # Compute second-half of Vay update
+            u = s * (u_star + dot(u_star, t) .* t + cross(u_star, t))
+
+            # Include ponderomotive force (i.e. nonlinear term)
+            u -= (dt * particle.q / (4 * particle.m * ω0^2)) .* [0, dEy2dy, 0]
+
+            # Convert back to velocity
+            particle.v[1] = u[3] ./ particle.γ
+            particle.v[2] = (u[2] ./ particle.γ)
+
         end
     end
         
@@ -304,25 +285,23 @@ function velocityUpdate(particles, E_z, E_y, H_x)
 
 end
 
+# Update particle positions and velocities
 function updateParticles(particles, E_z, E_y, H_x) 
 
-    # Perform half position update
+    # Perform half of position update
     for particle in particles
         i = Int(floor(particle.z / dz))
-        #i = Int(clamp(round(particle.z / dz), 1, Nz))
         if i >= 1 && i < Nz
             particle.z += 0.5 * particle.v[1] * dt
         end
     end
 
     # Perform velocity update
-    #particles = velocityUpdate(particles, E_z, E_y, H_x)
-    particles = borisUpdate(particles, E_z, E_y, H_x)
+    particles = velocityUpdate(particles, E_z, E_y, H_x)
 
     # Perform second half of position update
     for particle in particles
         i = Int(floor(particle.z / dz))
-        #i = Int(clamp(round(particle.z / dz), 1, Nz))
         if i >= 1 && i < Nz
             particle.z += 0.5 * particle.v[1] * dt
         end
@@ -331,7 +310,8 @@ function updateParticles(particles, E_z, E_y, H_x)
     return particles
 end
 
-function updatePermittivity(ρ, ω, ne)
+# Compute relative permittivity from plasma frequency
+function updatePermittivity(ω, ne)
     ωp = zeros(Nz)
     
     for i in 1:Nz
