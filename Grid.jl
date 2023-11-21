@@ -14,7 +14,8 @@ dt = dz / (2 * c0)
 τ = 512
 #τ = 640
 # Accounts for reflection from front surface
-excess = 0.4e-5 / dz
+front = 0.75 * Lz
+excess = round((4e-5 - front) / dz)
 # Roundtrip time
 T = 6 * τ * dt + 2 * ((Nz - excess) * dz / c0)
 nsteps = Int(ceil(T / dt))

@@ -26,10 +26,11 @@ global Φ, Ez = updateStatic(ρ, Φ, ϵ, Ez)
 #tt = range(1, nsteps, nsteps)
 #display(plot(tt .* dt .* 1e15, ge.(tt), xlims=[0,50]))
 #display(plot(z, Φ, label="Electric Potential"))
-#display(scatter(z, ρ, label="Charge Density"))
+#display(plot(z, ρ, label="Charge Density"))
 #display(plot(z, ne, label="Electron Density"))
 #display(plot!(z, ni, label="Ion Density"))
-end
+#print(length(particles))
+#end
 
 # Vector to save field for later processing
 Ey_save = zeros(nsteps)
@@ -60,16 +61,16 @@ for t = 1:nsteps
     Ey_save[t] = Ey[node]
 
     # Plotting
-    if t % 10 == 0
-        #local p = plot(z, Ey, label = "Ey", title = "1D PIC Simulation", lw = 2, ylims=[-1.5*E0, 1.5*E0], xlabel = "Z (μm)", ylabel="Field Strength (V/m)", legend = true)
+    if t % 50 == 0
+        local p = plot(z, Ey, label = "Ey", title = "1D PIC Simulation", lw = 2, ylims=[-1.5*E0, 1.5*E0], xlabel = "Z (μm)", ylabel="Electric Field Strength (V/m)", legend = true)
         #plot!(z, Hx, lw = 2, label = "Hx")
         #p = plot(z, Ez, label="Ez")
         #p = scatter(particle_z, Ey)
-        scatter!(z, ρ ./ norm(ρ), label="Charge Density")
+        #scatter!(z, ρ ./ norm(ρ), label="Charge Density")
         #local p = plot(z, ne, label="Electron Density")
         #plot!(z, ni, label="Ion Density")
         #p = plot(z, ϵr, label="Relative Permittivity")
-        #plot!(z, (dt ./ (ne .* e^2)) .* Jy, label = "Current Density (y)", color=:green)
+        plot!(z, (1e2*dt ./ (ne .* e^2)) .* Jy, label = "Jy x 100", color=:green)
         #plot!(z, Φ)
         #display(p)
         #savefig(p, "plot_$t.png")
@@ -80,8 +81,8 @@ end
 
 
 # Save incident and reflected fields from Ey_save
-Ey_inc = Ey_save[1:15500]
-Ey_ref = Ey_save[15501:end]
+#Ey_inc = Ey_save[1:15500]
+#Ey_ref = Ey_save[15501:end]
 
-writedlm( "Ey_inc.csv",  Ey_inc, ',')
-writedlm( "Ey_ref.csv",  Ey_ref, ',')
+#writedlm( "Ey_inc.csv",  Ey_inc, ',')
+#writedlm( "Ey_ref.csv",  Ey_ref, ',')

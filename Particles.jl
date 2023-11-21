@@ -13,7 +13,7 @@ Z = 14              # Silicon atomic number
 ϵ0 = 8.85e-12     # Vacuum permittivity
 
 # Plasma parameters
-num_particles = 75      # Number of particles per cell
+num_particles = 45      # Number of particles per cell
 Te = 1e3*11604    # Initial temperatures (1 keV)
 Ti = 1e3*11604
 nc = ϵ0 * me * ω0^2 / e^2   # Critical density (m^-3)
@@ -47,6 +47,7 @@ function initGrad(ne, ni)
 
     L = 0.5 * λ
     front = 0.9 * Lz
+    back = 1 * Lz
     eplasma_gradient(x) = ne0 * exp((x - front) / L)
     iplasma_gradient(x) = ni0 * exp((x - front) / L)
 
@@ -54,7 +55,8 @@ function initGrad(ne, ni)
         if i*dz <= front
             ne[i] = eplasma_gradient(i * dz)+1e-40
             ni[i] = iplasma_gradient(i * dz)+1e-40
-        else    
+        end
+        if i*dz > front && i*dz <= back
             ne[i] = ne0
             ni[i] = ni0 
         end
@@ -93,7 +95,7 @@ function updateDensity(particles, ne)
 
     for particle in particles
         i = Int(round(particle.z / dz)) 
-        if i >= 1 && i < Nz
+        if i >= 1 && i <= Nz
             if particle.s == "Electron"
                 ne[i] = particle.w * num_macroparticles[i] / dz
             end
@@ -137,7 +139,7 @@ function createParticles(num_particles, pos)
         #v = [0, 0]
         #γ = 1        
 
-            if i <= 70
+            if i <= 36
                 z =  pos * Lz
                 q = -e
                 v = initVelocities(Te, me, q)
@@ -166,11 +168,14 @@ function initParticles()
 
     particles = Particle[]
 
-    # Initial position corresponding to 6192 grid index
-    # Currently set for  particles (70 e & 5 ions) per cell
-    pos = 0.755859375
+    # Initial position corresponding to wanted grid index
+    # Currently set for  particles (36 e & 9 ions) per cell
+    pos = 0.7998046875
+    last = 1
+    #pos = 0.6500244140625
+    #last = 0.85
     step = 1/8192
-    num_iter = Int((1 - pos) / step)
+    num_iter = Int(round((last - pos) / step)) + 1
     
     for i in 1:num_iter
         electrons, ions = createParticles(num_particles, pos)
@@ -189,21 +194,6 @@ function initParticles()
     return particles
 end
 
-# Initialize Charge/Current Density without interpolation
-function initCharge(particles, ρ, Jz, Jy)
-    for particle in particles
-        i = Int(round(particle.z / dz))
-        if i >= 1 && i < Nz
-            ρ[i] = (particle.q * particle.w / dz)
-
-            Jz[i] = ρ[i] * particle.v[1]
-
-            Jy[i] = ρ[i] * particle.v[2]
-        end
-    end
-    return ρ, Jz, Jy
-end
-
 # Linear interpolation to calculate charge/current density on grid
 function InterpolateCharge(particles, ρ, Jz, Jy)
 
@@ -212,7 +202,7 @@ function InterpolateCharge(particles, ρ, Jz, Jy)
         if i >= 1 && i < Nz
             δz = particle.z / dz - i
 
-            ρ[i] = (1 - δz) * (particle.q * particle.w / dz)
+            ρ[i] = abs(1 - δz) * (particle.q * particle.w / dz)
             ρ[i + 1] = abs(δz) * (particle.q * particle.w / dz)
 
             Jz[i] = ρ[i] * particle.v[1]
