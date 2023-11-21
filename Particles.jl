@@ -167,7 +167,7 @@ function initParticles()
     particles = Particle[]
 
     # Initial position corresponding to 6192 grid index
-    # Currently set for  particles (20 e & 5 ions) per cell
+    # Currently set for  particles (70 e & 5 ions) per cell
     pos = 0.755859375
     step = 1/8192
     num_iter = Int((1 - pos) / step)
