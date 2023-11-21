@@ -79,7 +79,7 @@ function countParticles(particles)
     local num_macroparticles = zeros(Int, Nz)
 
     for particle in particles
-        i = Int(floor(particle.z / dz))  
+        i = Int(round(particle.z / dz))  
         num_macroparticles[i] += 1    
     end
 
