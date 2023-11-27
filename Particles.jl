@@ -45,7 +45,7 @@ end
 # Initialize plasma density profile
 function initGrad(ne, ni)
 
-    L = 0.5 * λ
+    L = 0.005 * λ
     front = 0.9 * Lz
     back = 1 * Lz
     eplasma_gradient(x) = ne0 * exp((x - front) / L)
@@ -53,8 +53,8 @@ function initGrad(ne, ni)
 
     for i in 1:Nz
         if i*dz <= front
-            ne[i] = eplasma_gradient(i * dz)+1e-40
-            ni[i] = iplasma_gradient(i * dz)+1e-40
+            ne[i] = eplasma_gradient(i * dz)+1e-60
+            ni[i] = iplasma_gradient(i * dz)+1e-60
         end
         if i*dz > front && i*dz <= back
             ne[i] = ne0
@@ -136,13 +136,13 @@ function createParticles(num_particles, pos)
 
     for i in 1:num_particles
         # Initial velocity to start at rest
-        #v = [0, 0]
+        v = [0, 0]
         #γ = 1        
 
             if i <= 36
                 z =  pos * Lz
                 q = -e
-                v = initVelocities(Te, me, q)
+                #v = initVelocities(Te, me, q)
                 w = 1.0
                 m = me
                 s = "Electron"
@@ -151,7 +151,7 @@ function createParticles(num_particles, pos)
             else
                 z = pos * Lz
                 q = Z*e
-                v = initVelocities(Ti, mi, q)
+                #v = initVelocities(Ti, mi, q)
                 w = 1.0
                 m = mi
                 s = "Ion"
@@ -172,9 +172,11 @@ function initParticles()
     # Currently set for  particles (36 e & 9 ions) per cell
     pos = 0.7998046875
     last = 1
-    #pos = 0.6500244140625
-    #last = 0.85
     step = 1/8192
+    # For testing
+    #pos = 0.80078125
+    #last = 1
+    #step = 1/512
     num_iter = Int(round((last - pos) / step)) + 1
     
     for i in 1:num_iter
@@ -216,7 +218,7 @@ function InterpolateCharge(particles, ρ, Jz, Jy)
 end
 
 # Poisson solver for 1D
-function solvePoisson(ρ, ϵ)
+function solvePoisson(ρ)
 
     # Generate triagiagonal matrix for the linear system:
     dl = [-ones(Nz-2); 0]
@@ -237,9 +239,9 @@ function solvePoisson(ρ, ϵ)
 end
 
 # Update static field
-function updateStatic(ρ, Φ, ϵ, Ez)
+function updateStatic(ρ, Φ, Ez)
 
-    Φ = solvePoisson(ρ, ϵ)
+    Φ = solvePoisson(ρ)
     for i in 2:Nz-1
         Ez[i] -= (0.5 * dz * (Φ[i + 1] - Φ[i - 1]))
     end

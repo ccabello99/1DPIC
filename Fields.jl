@@ -34,15 +34,16 @@ global σ = zeros(Nz)
 global ceh = zeros(Nz)
 global che = zeros(Nz)
 global cee = zeros(Nz)
-
+global cj = dt ./ ϵ
 # Update FDTD coeffiecients (includes loss term for plasma)
-function updateCoefficients(ϵr, μr)
+function updateCoefficients(ne, ϵr, μr)
     for i in 1:Nz
         σ[i] = (ne[i] * e^2) / me
         loss[i] = 0.5 * σ[i] * dt / ϵ[i]
         cee[i] = (1.0 - loss[i]) / (1.0 + loss[i]) 
         ceh[i] = c0 * dt ./ ϵr[i] ./ dz ./ (1.0 + loss[i])
         che[i] = c0 * dt ./ μr[i] ./ dz
+        
     end
     return ceh, che, cee, σ
 end
@@ -70,15 +71,15 @@ ne0 = 40*nc              # Fully ionized Si electron plasma density
 
 ## Gaussian Envelope Parameters
 # Normalized relativistic field amplitude
-a0 = 0.001      
+a0 = 100      
 # Electric field amplitude
 E0 = (c0 * me * ω0 * a0) / e              
 # H field time/spatial grid offset
 n_src = sqrt(ϵr[z_init] * μr[z_init])
 delta_t = (n_src * dz) / (2 * c0) + (dt / 2)    
 # Gaussian pulse centered at ω0 with correction to ΔCEP=0
-ge(t) = E0 .* exp(-((t - t0) ./ (τ)).^2) * cos((f * t)+π*5/4)
-gh(t) = -(E0 / η0) .* exp(-((t - t0 + delta_t) ./ (τ)).^2) * cos((f * t)+π*5/4)
+ge(t) = E0 .* exp(-((t - t0) ./ (τ)).^2) * cos((f * t)+π/4)
+gh(t) = -(E0 / η0) .* exp(-((t - t0 + delta_t) ./ (τ)).^2) * cos((f * t)+π/4)
 
 
 # Ricker Wavelet
@@ -111,7 +112,7 @@ function FDTD(Ey, Hx, E1, E2, E3, H1, H2, H3, Jy, t)
     end
 
     #Source current correction
-    Ey = Ey - ((dt ./ (ne .* e^2)) .* Jy)
+    Ey = Ey - cj .* Jy
 
     # Absorbing Boundary Condition at start of grid
     Ey[1] += ceh[1] * ((Hx[1] - H3))
